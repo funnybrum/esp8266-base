@@ -27,3 +27,7 @@ The WiFi Manager will take care for the WiFi connectivity. Integrated with the o
 A tool to automate the data publishing to InfluxDB. Requires DB that is not password protected. Designed with one main goal - to reduce the WiFi polution. Data is collected in in-memory buffer and pushed once the buffer is full or the time for a push has come.
 
 Several parameters can be configured, but the main one are - push interval, collect interval and InfluxDB address. If all of them are valid - the microcontroller will keep the WiFi off while data is being collected on regular intervals. Once the time for push has come - WiFi will be turned on, data will be pushed to the InfluxDB and the WiFi will be turned off again.
+
+# Usage
+
+Clone the project in the lib/common folder and just use the provided classes.
