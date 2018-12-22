@@ -38,11 +38,6 @@ class WebServerBase {
 
         virtual void registerHandlers() = 0;
 
-    protected:
-        Logger* logger = NULL;
-        SystemCheck* systemCheck = NULL;
-        ESP8266WebServer *server;
-
         void process_setting(const char* name, char* destination, uint8_t max_size, bool& success) {
             if (server->hasArg(name)) {
                 String new_value = server->arg(name);
@@ -86,6 +81,11 @@ class WebServerBase {
                 }
             }
         }
+
+    protected:
+        Logger* logger = NULL;
+        SystemCheck* systemCheck = NULL;
+        ESP8266WebServer *server;
 
     private:
         ESP8266HTTPUpdateServer *httpUpdater;

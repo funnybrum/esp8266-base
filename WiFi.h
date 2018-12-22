@@ -3,7 +3,14 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 
+struct NetworkSettings {
+    char hostname[64];
+    char ssid[32];
+    char password[32];
+};
+
 #include "Logger.h"
+#include "WebServerBase.h"
 
 const char NETWORK_CONFIG_PAGE[] PROGMEM = R"=====(
 <fieldset style='display: inline-block; width: 300px'>
@@ -24,12 +31,6 @@ enum WiFiState {
     CONNECTING,
     CONNECTED,
     DISCONNECTED
-};
-
-struct NetworkSettings {
-    char hostname[64];
-    char ssid[32];
-    char password[32];
 };
 
 class WiFiManager {
@@ -96,6 +97,21 @@ class WiFiManager {
         bool isConnected() {
             return WiFi.status() == WL_CONNECTED && state == CONNECTED;
         }
+
+        void get_config_page(char* buffer) {
+            sprintf_P(
+                buffer,
+                NETWORK_CONFIG_PAGE,
+                settings->hostname,
+                settings->ssid);
+        }
+
+        void parse_config_params(WebServerBase* webServer, bool& save) {
+            webServer->process_setting("hostname", settings->hostname, sizeof(settings->hostname), save);
+            webServer->process_setting("ssid", settings->ssid, sizeof(settings->ssid), save);
+            webServer->process_setting("password", settings->password, sizeof(settings->password), save);
+        }
+
     private:
         void _connect() {
             WiFi.disconnect();

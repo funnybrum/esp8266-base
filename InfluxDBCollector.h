@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 #include "WiFi.h"
+#include "WebServerBase.h"
 
 const char INFLUXDB_CONFIG_PAGE[] PROGMEM = R"=====(
 <fieldset style='display: inline-block; width: 300px'>
@@ -154,6 +155,27 @@ class InfluxDBCollector {
             lastDataPush = millis();
             remoteTimestamp = 0;
         }
+
+        void get_config_page(char* buffer) {
+            sprintf_P(
+                buffer,
+                INFLUXDB_CONFIG_PAGE,
+                (settings->enable)?"selected":"",
+                (!settings->enable)?"selected":"",
+                settings->address,
+                settings->database,
+                settings->collectInterval,
+                settings->pushInterval);
+        }
+
+        void parse_config_params(WebServerBase* webServer, bool& save) {
+            webServer->process_setting("ifx_enabled", settings->enable, save);
+            webServer->process_setting("ifx_address", settings->address, sizeof(settings->address), save);
+            webServer->process_setting("ifx_db", settings->database, sizeof(settings->database), save);
+            webServer->process_setting("ifx_collect", settings->collectInterval, save);
+            webServer->process_setting("ifx_push", settings->pushInterval, save);
+        }
+
     private:
         // Sync the local timestamp based on the date/time response from the InfluxDB server. This
         // is needed in order to append the proper timestamps to the metrics beeing generated.
