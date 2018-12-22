@@ -13,6 +13,10 @@
  */
 class Logger {
     public:
+        Logger(bool serial_output=true) {
+            this->serial_output = serial_output;
+        }
+
         void begin() {
             buffer[0] = '\0';
         }
@@ -48,8 +52,9 @@ class Logger {
             char buffer[128];
             vsnprintf(buffer, sizeof(buffer), format, arg);
             va_end(arg);
-
-            Serial.println(buffer);
+            if (this->serial_output) {
+                Serial.println(buffer);
+            }
             log(buffer);
         }
 
@@ -60,4 +65,5 @@ class Logger {
     private:
         char buffer[LOG_SIZE];
         unsigned int pos = 0;
+        bool serial_output;
 };

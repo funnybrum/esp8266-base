@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Logger.h"
-#include "Arduino.h"
+#include <EEPROM.h>
 
 extern Logger logger;
 

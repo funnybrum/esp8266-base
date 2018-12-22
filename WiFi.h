@@ -5,6 +5,21 @@
 
 #include "Logger.h"
 
+const char NETWORK_CONFIG_PAGE[] PROGMEM = R"=====(
+<fieldset style='display: inline-block; width: 300px'>
+<legend>Network settings</legend>
+Hostname:<br>
+<input type="text" name="hostname" value="%s"><br>
+<small><em>from 4 to 63 characters lenght, can contain chars, digits and '-'</em></small><br><br>
+SSID:<br>
+<input type="text" name="ssid" value="%s"><br>
+<small><em>WiFi network to connect to</em></small><br><br>
+Password:<br>
+<input type="password" name="password"><br>
+<small><em>WiFi network password</em></small><br>
+</fieldset>
+)=====";
+
 enum WiFiState {
     CONNECTING,
     CONNECTED,

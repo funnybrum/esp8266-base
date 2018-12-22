@@ -62,6 +62,13 @@ class WebServerBase {
 
         void process_setting(const char* name, uint16_t& destination, bool& success) {
             if (server->hasArg(name)) {
+                destination = atof(server->arg(name).c_str());
+                success = true;
+            }
+        }
+
+        void process_setting(const char* name, float& destination, bool& success) {
+            if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
                 success = true;
             }
