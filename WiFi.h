@@ -30,7 +30,8 @@ Password:<br>
 enum WiFiState {
     CONNECTING,
     CONNECTED,
-    DISCONNECTED
+    DISCONNECTED,
+    AP
 };
 
 class WiFiManager {
@@ -67,13 +68,22 @@ class WiFiManager {
                             IPAddress(192, 168, 0, 1),
                             IPAddress(255, 255, 255, 0)); 
                         WiFi.softAP(settings->hostname);
-                        state = CONNECTED;
+                        state = AP;
                         lastStateSetAt = millis();
                     }
                     break;
                 case DISCONNECTED:
                     // Do nothing.
                     break;
+                case AP:
+                    // If there is network configured - don't stay in AP mode for more than 5
+                    // minutes. Try to reconnect to the configured network.
+                    if (strlen(settings->ssid) > 1 &&
+                        millis() - lastStateSetAt > 5 * 60 * 1000) {
+                        disconnect();
+                        delay(1000);
+                        connect();
+                    }
             }
         }
 
@@ -151,7 +161,7 @@ class WiFiManager {
                 WiFi.softAP(settings->hostname);
 
                 lastStateSetAt = millis();
-                state = CONNECTED;
+                state = AP;
             }
 
             WiFi.scanDelete();
