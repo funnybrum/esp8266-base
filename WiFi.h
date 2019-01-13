@@ -108,6 +108,10 @@ class WiFiManager {
             return WiFi.status() == WL_CONNECTED && state == CONNECTED;
         }
 
+        bool isInAPMode() {
+            return state == AP;
+        }
+
         void get_config_page(char* buffer) {
             sprintf_P(
                 buffer,
