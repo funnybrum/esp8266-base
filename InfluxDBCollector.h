@@ -89,7 +89,10 @@ class InfluxDBCollector {
                 } else {
                     if (push()) {
                         lastDataPush = millis();
-                        wifi->disconnect();
+                        // Don't disconnect in the first 30 minutes.
+                        if (millis() > 30 * 60 * 1000) {
+                            wifi->disconnect();
+                        }
                     }
                 }
             }

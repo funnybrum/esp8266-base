@@ -25,6 +25,10 @@ class Logger {
         }
 
         void log(char* msg) {
+            if (pos > strlen(msg) && strncmp(msg, buffer + pos - strlen(msg) - 1, strlen(msg)) == 0) {
+                return;
+            }
+
             // new_size = pos + strlen(msg) + 1 '\n' + 1 '\0'
             // this will overflow the buffer by new_size - sizeof(buffer)
             int overflowBy = pos + strlen(msg) + 2 - sizeof(buffer);
