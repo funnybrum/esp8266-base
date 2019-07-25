@@ -25,8 +25,13 @@ class Logger {
         }
 
         void log(char* msg) {
+            // Check if the log is being duplicated. There is no usecase for identical logs...
             if (pos > strlen(msg) && strncmp(msg, buffer + pos - strlen(msg) - 1, strlen(msg)) == 0) {
                 return;
+            }
+
+            if (this->serial_output) {
+                Serial.println(buffer);
             }
 
             // new_size = pos + strlen(msg) + 1 '\n' + 1 '\0'
@@ -56,9 +61,6 @@ class Logger {
             char buffer[128];
             vsnprintf(buffer, sizeof(buffer), format, arg);
             va_end(arg);
-            if (this->serial_output) {
-                Serial.println(buffer);
-            }
             log(buffer);
         }
 
