@@ -31,7 +31,7 @@ class Logger {
             }
 
             if (this->serial_output) {
-                Serial.println(buffer);
+                Serial.println(msg);
             }
 
             // new_size = pos + strlen(msg) + 1 '\n' + 1 '\0'
