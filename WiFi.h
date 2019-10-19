@@ -155,7 +155,7 @@ class WiFiManager {
                 lastStateSetAt = millis();
                 state = CONNECTING;
             } else {
-                logger->log("%s not found, switching to AP mode", settings->ssid);
+                logger->log("SSID \"%s\" not found, switching to AP mode", settings->ssid);
 
                 // For debug purposes - switch to access mode.
                 WiFi.softAPConfig(
