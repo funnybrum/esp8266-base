@@ -43,20 +43,18 @@ struct InfluxDBCollectorSettings {
 
 class InfluxDBCollector {
     public:
-        InfluxDBCollector(Logger* logger,
-                          WiFiManager* wifi,
+        virtual void collectData(InfluxDBCollector* collector) = 0;
+        virtual void onPush() = 0;
+        virtual bool shouldPush() = 0;
+
+        InfluxDBCollector(Logger* _logger,
+                          WiFiManager* _wifi,
                           InfluxDBCollectorSettings* settings,
-                          NetworkSettings* networkSettings,
-                          void (*collectDataCallback)(InfluxDBCollector*),
-                          bool (*shouldPushCallback)(void) = NULL,
-                          void (*onPushCallback)(void) = NULL) {
-            this->logger = logger;
-            this->wifi = wifi;
+                          NetworkSettings* networkSettings) {
+            this->_logger = _logger;
+            this->_wifi = _wifi;
             this->settings = settings;
             this->networkSettings = networkSettings;
-            this->collectDataCallback = collectDataCallback;
-            this->onPushCallback = onPushCallback;
-            this->shouldPushCallback = shouldPushCallback;
         }
 
         void begin() {
@@ -73,8 +71,8 @@ class InfluxDBCollector {
             if (remoteTimestamp == 0) {
                 // This will be executed only once on startup. Don't shutdown the WiFi, the first
                 // push will do that.
-                if (!wifi->isConnected()) {
-                    wifi->connect();
+                if (!_wifi->isConnected()) {
+                    _wifi->connect();
                 } else {
                     ping();
                 }
@@ -82,23 +80,23 @@ class InfluxDBCollector {
 
             if (millis() - lastDataPush > settings->pushInterval * 1000 ||
                 telemetryDataSize >= 0.80f * TELEMETRY_BUFFER_SIZE ||
-                (shouldPushCallback != NULL && shouldPushCallback())) {
+                shouldPush()) {
                 // Time for push. Either the time for that has come or the buffer is getting full.
-                if (!wifi->isConnected()) {
-                    wifi->connect();
+                if (!_wifi->isConnected()) {
+                    _wifi->connect();
                 } else {
                     if (push()) {
                         lastDataPush = millis();
                         // Don't disconnect in the first 30 minutes.
                         if (millis() > 30 * 60 * 1000) {
-                            wifi->disconnect();
+                            _wifi->disconnect();
                         }
                     }
                 }
             }
 
             if (millis() - lastDataCollect > settings->collectInterval * 1000) {
-                collectDataCallback(this);
+                collectData(this);
                 lastDataCollect += settings->collectInterval * 1000;
             }
         }
@@ -132,7 +130,7 @@ class InfluxDBCollector {
             if (telemetryDataSize + metricSize > TELEMETRY_BUFFER_SIZE) {
                 // In that case - we don't have the whole metric line in the buffer.
                 telemetryData[telemetryDataSize] = '\0';
-                logger->log("Telemetry buffer overflow!");
+                _logger->log("Telemetry buffer overflow!");
             } else {
                 telemetryDataSize += metricSize;
             }
@@ -190,7 +188,7 @@ class InfluxDBCollector {
         void syncTime(const char* dateTime) {
             if (strlen(dateTime) != 29) {
                 // Something's wrong. The datetime should be 29 characters.
-                logger->log("Failed to parse the InfluxDB date/time: %s", dateTime);
+                _logger->log("Failed to parse the InfluxDB date/time: %s", dateTime);
                 return;
             }
             // Get the millis when the remote date was received.
@@ -283,14 +281,12 @@ class InfluxDBCollector {
             if (statusCode == 204) {
                 telemetryDataSize = 0;
                 syncTime(http->header("date").c_str());
-                if (onPushCallback != NULL) {
-                    onPushCallback();
-                }
+                onPush();
                 return true;
             } else {
-                logger->log("Push failed with HTTP %d", statusCode);
-                wifi->disconnect();
-                wifi->connect();
+                _logger->log("Push failed with HTTP %d", statusCode);
+                _wifi->disconnect();
+                _wifi->connect();
             }
 
             return false;
@@ -305,11 +301,8 @@ class InfluxDBCollector {
         bool enabled = false;
         HTTPClient* http = NULL;
 
-        Logger* logger = NULL;
-        WiFiManager* wifi = NULL;
+        Logger* _logger = NULL;
+        WiFiManager* _wifi = NULL;
         InfluxDBCollectorSettings* settings = NULL;
         NetworkSettings* networkSettings = NULL;
-        void (*collectDataCallback)(InfluxDBCollector*) = NULL;
-        bool (*shouldPushCallback)(void) = NULL;
-        void (*onPushCallback)(void) = NULL;
 };
