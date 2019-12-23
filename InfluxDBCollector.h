@@ -1,5 +1,7 @@
 #pragma once
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #include <ESP8266HTTPClient.h>
 
 #include "Logger.h"
