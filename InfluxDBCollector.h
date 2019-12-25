@@ -55,8 +55,8 @@ class InfluxDBCollector {
                           NetworkSettings* networkSettings) {
             this->_logger = _logger;
             this->_wifi = _wifi;
-            this->settings = settings;
-            this->networkSettings = networkSettings;
+            this->_settings = settings;
+            this->_networkSettings = networkSettings;
         }
 
         void begin() {
@@ -66,7 +66,10 @@ class InfluxDBCollector {
         }
 
         void loop() {
-            if (!enabled) {
+            if (_settings->enable) {
+                start();
+            } else {
+                stop();
                 return;
             }
 
@@ -80,7 +83,7 @@ class InfluxDBCollector {
                 }
             }
 
-            if (millis() - lastDataPush > settings->pushInterval * 1000 ||
+            if (millis() - lastDataPush > _settings->pushInterval * 1000 ||
                 telemetryDataSize >= 0.80f * TELEMETRY_BUFFER_SIZE ||
                 shouldPush()) {
                 // Time for push. Either the time for that has come or the buffer is getting full.
@@ -97,9 +100,9 @@ class InfluxDBCollector {
                 }
             }
 
-            if (millis() - lastDataCollect > settings->collectInterval * 1000) {
+            if (millis() - lastDataCollect > _settings->collectInterval * 1000) {
                 collectData(this);
-                lastDataCollect += settings->collectInterval * 1000;
+                lastDataCollect += _settings->collectInterval * 1000;
             }
         }
 
@@ -113,7 +116,7 @@ class InfluxDBCollector {
                     TELEMETRY_BUFFER_SIZE - telemetryDataSize,
                     format,
                     metric,
-                    networkSettings->hostname,
+                    _networkSettings->hostname,
                     value,
                     getTimestamp());
             } else {
@@ -125,7 +128,7 @@ class InfluxDBCollector {
                     TELEMETRY_BUFFER_SIZE - telemetryDataSize,
                     format,
                     metric,
-                    networkSettings->hostname,
+                    _networkSettings->hostname,
                     value);
             }
 
@@ -159,7 +162,7 @@ class InfluxDBCollector {
 
             enabled = true;
 
-            lastDataCollect = millis() - settings->collectInterval * 1000;
+            lastDataCollect = millis() - _settings->collectInterval * 1000;
             lastDataPush = millis();
             remoteTimestamp = 0;
         }
@@ -168,20 +171,20 @@ class InfluxDBCollector {
             sprintf_P(
                 buffer,
                 INFLUXDB_CONFIG_PAGE,
-                (settings->enable)?"selected":"",
-                (!settings->enable)?"selected":"",
-                settings->address,
-                settings->database,
-                settings->collectInterval,
-                settings->pushInterval);
+                (_settings->enable)?"selected":"",
+                (!_settings->enable)?"selected":"",
+                _settings->address,
+                _settings->database,
+                _settings->collectInterval,
+                _settings->pushInterval);
         }
 
         void parse_config_params(WebServerBase* webServer, bool& save) {
-            webServer->process_setting("ifx_enabled", settings->enable, save);
-            webServer->process_setting("ifx_address", settings->address, sizeof(settings->address), save);
-            webServer->process_setting("ifx_db", settings->database, sizeof(settings->database), save);
-            webServer->process_setting("ifx_collect", settings->collectInterval, save);
-            webServer->process_setting("ifx_push", settings->pushInterval, save);
+            webServer->process_setting("ifx_enabled", _settings->enable, save);
+            webServer->process_setting("ifx_address", _settings->address, sizeof(_settings->address), save);
+            webServer->process_setting("ifx_db", _settings->database, sizeof(_settings->database), save);
+            webServer->process_setting("ifx_collect", _settings->collectInterval, save);
+            webServer->process_setting("ifx_push", _settings->pushInterval, save);
         }
 
     private:
@@ -261,7 +264,7 @@ class InfluxDBCollector {
         // Executed with only purpose to get the current timestamp of the IndluxDB.
         void ping() {
             String url = "";
-            url += settings->address;
+            url += _settings->address;
             url += "/ping";
             http->begin(url);
             int httpCode = http->GET();
@@ -273,9 +276,9 @@ class InfluxDBCollector {
 
         bool push() {
             String url = "";
-            url += settings->address;
+            url += _settings->address;
             url += "/write?precision=s&db=";
-            url += settings->database;
+            url += _settings->database;
 
             http->begin(url);
             int statusCode = http->POST((uint8_t *)telemetryData, telemetryDataSize-1);  // -1 to remove
@@ -305,6 +308,6 @@ class InfluxDBCollector {
 
         Logger* _logger = NULL;
         WiFiManager* _wifi = NULL;
-        InfluxDBCollectorSettings* settings = NULL;
-        NetworkSettings* networkSettings = NULL;
+        InfluxDBCollectorSettings* _settings = NULL;
+        NetworkSettings* _networkSettings = NULL;
 };
