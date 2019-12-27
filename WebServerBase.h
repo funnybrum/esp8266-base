@@ -62,6 +62,13 @@ class WebServerBase {
             }
         }
 
+        void process_setting(const char* name, int8_t& destination, bool& success) {
+            if (server->hasArg(name)) {
+                destination = server->arg(name).toInt();
+                success = true;
+            }
+        }
+
         void process_setting(const char* name, uint8_t& destination, bool& success) {
             if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
