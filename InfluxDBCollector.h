@@ -81,13 +81,16 @@ class InfluxDBCollector {
                 return;
             }
 
-            if (remoteTimestamp == 0) {
-                // This will be executed only once on startup. Don't shutdown the WiFi, the first
-                // push will do that.
+            // Get the remote time stamp every 24 hours.
+            if (remoteTimestamp == 0 || (millis() - remoteTimestampMillis) > 24 * 60 * 60 * 1000) {
                 if (!_wifi->isConnected()) {
                     _wifi->connect();
                 } else {
                     ping();
+                    // Don't disconnect in the first 30 minutes.
+                    if (millis() > 30 * 60 * 1000) {
+                        _wifi->disconnect();
+                    }
                 }
             }
 
@@ -108,7 +111,13 @@ class InfluxDBCollector {
                 }
             }
 
-            if (millis() - lastDataCollect > _settings->collectInterval * 1000 && shouldCollect()) {
+            // Collect if all of the following is true:
+            // 1) The time for that has come.
+            // 2) The "shouldCollect" returns true.
+            // 3) The timestamp is initialized.
+            if (remoteTimestamp > 0 &&
+                millis() - lastDataCollect > _settings->collectInterval * 1000 &&
+                shouldCollect()) {
                 collectData();
                 lastDataCollect += _settings->collectInterval * 1000;
             }
@@ -195,7 +204,7 @@ class InfluxDBCollector {
             webServer->process_setting("ifx_push", _settings->pushInterval, save);
         }
 
-    private:
+    // private:
         // Sync the local timestamp based on the date/time response from the InfluxDB server. This
         // is needed in order to append the proper timestamps to the metrics beeing generated.
         void syncTime(const char* dateTime) {
@@ -261,9 +270,9 @@ class InfluxDBCollector {
         }
 
         unsigned long getTimestamp() {
-            // The below would be correct even if the millis() have rolled over. The only requirement for
-            // this to work is to have the last timestamp retrieved before less than the millis rollover
-            // period that is ~50 days.
+            // The below would be correct even if the millis() have rolled over. The only
+            // requirement for this to work is to have the last timestamp retrieved before not more
+            // than the millis rollover period that is ~50 days.
             unsigned long secondsSinceTimestampRetrieval = (millis() - remoteTimestampMillis) / 1000;
 
             return remoteTimestamp + secondsSinceTimestampRetrieval;
