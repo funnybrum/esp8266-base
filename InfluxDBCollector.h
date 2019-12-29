@@ -31,6 +31,7 @@ Push interval:<br>
 </fieldset>
 )=====";
 
+// Size of the in-memory buffer. The bigger, the better. But consider the available RAM.
 #ifndef TELEMETRY_BUFFER_SIZE
 #define TELEMETRY_BUFFER_SIZE 24 * 1024
 #endif
@@ -45,8 +46,15 @@ struct InfluxDBCollectorSettings {
 
 class InfluxDBCollector {
     public:
-        virtual void collectData(InfluxDBCollector* collector) = 0;
+        // Check if data is ready to be collected.
+        virtual bool shouldCollect() = 0;
+        // Collect the data.
+        virtual void collectData() = 0;
+
+        // Will be called on each push.
         virtual void onPush() = 0;
+
+        // If result is true data will be pushed on the current loop cycle.
         virtual bool shouldPush() = 0;
 
         InfluxDBCollector(Logger* _logger,
@@ -100,8 +108,8 @@ class InfluxDBCollector {
                 }
             }
 
-            if (millis() - lastDataCollect > _settings->collectInterval * 1000) {
-                collectData(this);
+            if (millis() - lastDataCollect > _settings->collectInterval * 1000 && shouldCollect()) {
+                collectData();
                 lastDataCollect += _settings->collectInterval * 1000;
             }
         }
