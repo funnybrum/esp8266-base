@@ -10,6 +10,8 @@
 // Compatible with version 6 of the ArduinoJson library.
 #include <ArduinoJson.h>
 
+#define JSON_DOC_CAPACITY 3*JSON_ARRAY_SIZE(1) + 2*JSON_ARRAY_SIZE(2) + JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + 120
+
 const char INFLUXDB_CLIENT_CONFIG_PAGE[] PROGMEM = R"=====(
 <fieldset style='display: inline-block; width: 300px'>
 <legend>InfluxDB client settings</legend>
@@ -19,6 +21,9 @@ Address:<br>
 Database:<br>
 <input type="text" name="ifxc_db" value="%s"><br>
 <small><em>Database to query</em></small><br><br>
+Metric:<br>
+<input type="text" name="ifxc_metric" value="%s"><br>
+<small><em>i.e. humidity</em></small><br><br>
 Value for the 'src' tag:<br>
 <input type="text" name="ifxc_src" value="%s"><br>
 <small><em>The src to be queried</em></small><br><br>
@@ -36,6 +41,7 @@ struct InfluxDBClientSettings {
     char address[64];
     char database[16];
     char srcTag[32];
+    char metric[16];
     uint16_t queryInterval;
     uint16_t lookBack;
 };
@@ -54,6 +60,7 @@ class InfluxDBClient {
 
         void begin() {
             http = new HTTPClient();
+            doc = new DynamicJsonDocument(JSON_DOC_CAPACITY);
             lastQuery = millis() - _settings->queryInterval * 1000;
         }
 
@@ -80,6 +87,7 @@ class InfluxDBClient {
                 INFLUXDB_CLIENT_CONFIG_PAGE,
                 _settings->address,
                 _settings->database,
+                _settings->metric,
                 _settings->srcTag,
                 _settings->queryInterval,
                 _settings->lookBack);
@@ -88,36 +96,50 @@ class InfluxDBClient {
         void parse_config_params(WebServerBase* webServer, bool& save) {
             webServer->process_setting("ifxc_address", _settings->address, sizeof(_settings->address), save);
             webServer->process_setting("ifxc_db", _settings->database, sizeof(_settings->database), save);
+            webServer->process_setting("ifxc_metric", _settings->metric, sizeof(_settings->metric), save);
             webServer->process_setting("ifxc_src", _settings->srcTag, sizeof(_settings->srcTag), save);
             webServer->process_setting("ifxc_qi", _settings->queryInterval, save);
             webServer->process_setting("ifxc_lb", _settings->lookBack, save);
         }
 
         float getQueryResult() {
-            return lastQuery;
+            return lastDataPoint;
         }
 
-    // private:
+        bool isDataAvailable() {
+            return dataAvailable;
+        }
+
+    private:
         bool query() {
+            if (strlen(_settings->address) < 5 ||
+                strlen(_settings->database) == 0 ||
+                strlen(_settings->metric) == 0 ||
+                strlen(_settings->srcTag) == 0) {
+                _logger->log("InfluxDB integration is not configure.");
+                return false;
+            }
             String url = "";
             url += _settings->address;
             url += "/query?db=";
             url += _settings->database;
-            url += "&q=SELECT%20last%28%22value%22%29%20FROM%20%22humidity%22%20WHERE%20time%20%3E%3D%20now%28%29%20-%20";
+            url += "&q=SELECT+last%28%22value%22%29+FROM+%22";
+            url += _settings->metric;
+            url += "%22+WHERE+time+%3E%3D+now%28%29+-+";
             url += _settings->lookBack;
-            url += "m%20AND%20%22src%22%3D%27";
+            url += "m+AND+%22src%22%3D%27";
             url += _settings->srcTag;
-            url += "%27'";
+            url += "%27";
 
             http->begin(url);
             int statusCode = http->GET();
 
             bool success = statusCode == 200;
             if (success) {
-                DynamicJsonDocument doc(2048);
-                deserializeJson(doc, http->getString());
-                if (doc["results"][0].containsKey("series")) {
-                    lastDataPoint = doc["results"][0]["series"][0]["values"][0][1];
+                deserializeJson(*doc, http->getString());
+                if ((*doc)["results"][0].containsKey("series")) {
+                    lastDataPoint = (*doc)["results"][0]["series"][0]["values"][0][1];
+                    dataAvailable = true;
                 } else {
                     _logger->log("InfluxDB response with no data.");
                 }
@@ -133,11 +155,13 @@ class InfluxDBClient {
 
         unsigned long lastQuery;
         HTTPClient* http = NULL;
+        DynamicJsonDocument *doc;
 
         Logger* _logger = NULL;
         WiFiManager* _wifi = NULL;
         InfluxDBClientSettings* _settings = NULL;
         NetworkSettings* _networkSettings = NULL;
 
+        bool dataAvailable = false;
         float lastDataPoint = -1;
 };
