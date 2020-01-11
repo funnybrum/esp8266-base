@@ -33,7 +33,6 @@ Query interval:<br>
 Query window:<br>
 <input type="text" name="ifxc_lb" value="%d"><br>
 <small><em>Look back minutes, from 0 to 65535</em></small><br><br>
-
 </fieldset>
 )=====";
 
@@ -65,8 +64,12 @@ class InfluxDBClient {
         }
 
         void loop() {
+            if (_settings->queryInterval < 0 || strlen(_settings->database) < 0) {
+                // Not configured.
+                return;
+            }
             if (millis() - lastQuery > _settings->queryInterval * 1000) {
-                // Time for push. Either the time for that has come or the buffer is getting full.
+                // Time for pull. Either the time for that has come or the buffer is getting full.
                 if (!_wifi->isConnected()) {
                     _wifi->connect();
                 } else {
@@ -108,6 +111,10 @@ class InfluxDBClient {
 
         bool isDataAvailable() {
             return dataAvailable;
+        }
+
+        void purgeData() {
+            dataAvailable = false;
         }
 
     private:
