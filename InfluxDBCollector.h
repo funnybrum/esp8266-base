@@ -94,6 +94,9 @@ class InfluxDBCollector {
                 }
             }
 
+            // TODO: delay further push attempts with 1 minute. Currently if there is an issue with
+            // the InfluxDB the microcontroller keeps a constant loop of disconnet, connect, httpp
+            // call untill the data is pushed.
             if (millis() - lastDataPush > _settings->pushInterval * 1000 ||
                 telemetryDataSize >= 0.80f * TELEMETRY_BUFFER_SIZE ||
                 shouldPush()) {
