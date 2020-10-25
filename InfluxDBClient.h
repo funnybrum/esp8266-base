@@ -73,7 +73,7 @@ class InfluxDBClient {
                 if (!_wifi->isConnected()) {
                     _wifi->connect();
                 } else {
-                    if (query()) {
+                    if (_query(_settings->lookBack)) {
                         lastQuery = millis();
                         // Don't disconnect in the first 10 minutes.
                         if (millis() > 10 * 60 * 1000) {
@@ -106,7 +106,10 @@ class InfluxDBClient {
         }
 
         float getQueryResult() {
-            return lastDataPoint;
+            if (isDataAvailable()) {
+                return lastDataPoint;
+            }
+            return 0;
         }
 
         bool isDataAvailable() {
@@ -117,8 +120,20 @@ class InfluxDBClient {
             dataAvailable = false;
         }
 
+        // Query the data point that has been published X minutes ago.
+        bool query(uint16_t minutesAgo) {
+            return _query(minutesAgo+1, minutesAgo);
+        }
+
     private:
-        bool query() {
+        /** Get the last data point in the specified interval.
+         * 
+         * @param notOlderThan Specifies the interval start. The value is processed as now() - X
+         *      minutes. Required.
+         * @param notNewerThan Specifies the interval end. The value is processed as now() - Y
+         *      minutes. Default value is 0 or in other words - look for data up till now.
+         */
+        bool _query(uint16_t notOlderThan, uint16_t notNewerThan=0) {
             if (strlen(_settings->address) < 5 ||
                 strlen(_settings->database) == 0 ||
                 strlen(_settings->metric) == 0 ||
@@ -133,8 +148,14 @@ class InfluxDBClient {
             url += "&q=SELECT+last%28%22value%22%29+FROM+%22";
             url += _settings->metric;
             url += "%22+WHERE+time+%3E%3D+now%28%29+-+";
-            url += _settings->lookBack;
-            url += "m+AND+%22src%22%3D%27";
+            url += notOlderThan;
+            url += "m+";
+            if (notNewerThan) {
+                url += "AND+time+%3C%3D+now%28%29+-+";
+                url += notNewerThan;
+                url += "m+";
+            }
+            url += "AND+%22src%22%3D%27";
             url += _settings->srcTag;
             url += "%27";
 
@@ -146,12 +167,18 @@ class InfluxDBClient {
                 deserializeJson(*doc, http->getString());
                 if ((*doc)["results"][0].containsKey("series")) {
                     lastDataPoint = (*doc)["results"][0]["series"][0]["values"][0][1];
+                    const char* ts = (*doc)["results"][0]["series"][0]["values"][0][0];
+                    _logger->log("Got %.2f at %s", lastDataPoint, ts);
                     dataAvailable = true;
+                    // _logger->log("[ifc] Got %.1f at %s",
+                    //     (*doc)["results"][0]["series"][0]["values"][0][1],
+                    //     (*doc)["results"][0]["series"][0]["values"][0][0]);
                 } else {
+                    success = false;
                     _logger->log("InfluxDB response with no data.");
                 }
             } else {
-                _logger->log("Query failed with HTTP %d", statusCode);
+                _logger->log("Query for %s failed with HTTP %d", url.c_str(), statusCode);
                 _wifi->disconnect();
                 _wifi->connect();
             }
