@@ -302,19 +302,20 @@ class InfluxDBCollector {
 
             http->begin(url);
             int statusCode = http->POST((uint8_t *)telemetryData, telemetryDataSize-1);  // -1 to remove
-                                                                                        // the last '\n'.
-            if (statusCode == 204) {
+                        
+            bool success = statusCode == 204;                                                                // the last '\n'.
+            if (success) {
                 telemetryDataSize = 0;
                 syncTime(http->header("date").c_str());
                 onPush();
-                return true;
             } else {
                 _logger->log("Push failed with HTTP %d", statusCode);
                 _wifi->disconnect();
                 _wifi->connect();
             }
 
-            return false;
+            http->end();
+            return success;
         }
 
         char telemetryData[TELEMETRY_BUFFER_SIZE];
