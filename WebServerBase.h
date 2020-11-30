@@ -38,60 +38,52 @@ class WebServerBase {
 
         virtual void registerHandlers() = 0;
 
-        void process_setting(const char* name, char* destination, uint8_t max_size, bool& success) {
+        void process_setting(const char* name, char* destination, uint8_t max_size) {
             if (server->hasArg(name)) {
                 String new_value = server->arg(name);
                 if (new_value.length() > 2 && new_value.length()+1 < max_size) {
                     strcpy(destination, new_value.c_str());
-                    success = true;
                 }
             }
         }
 
-        void process_setting(const char* name, int16_t& destination, bool& success) {
+        void process_setting(const char* name, int16_t& destination) {
             if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
-                success = true;
             }
         }
 
-        void process_setting(const char* name, uint16_t& destination, bool& success) {
+        void process_setting(const char* name, uint16_t& destination) {
             if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
-                success = true;
             }
         }
 
-        void process_setting(const char* name, int8_t& destination, bool& success) {
+        void process_setting(const char* name, int8_t& destination) {
             if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
-                success = true;
             }
         }
 
-        void process_setting(const char* name, uint8_t& destination, bool& success) {
+        void process_setting(const char* name, uint8_t& destination) {
             if (server->hasArg(name)) {
                 destination = server->arg(name).toInt();
-                success = true;
             }
         }
 
-        void process_setting(const char* name, float& destination, bool& success) {
+        void process_setting(const char* name, float& destination) {
             if (server->hasArg(name)) {
                 destination = atof(server->arg(name).c_str());
-                success = true;
             }
         }
 
-        void process_setting(const char* name, bool& destination, bool& success) {
+        void process_setting(const char* name, bool& destination) {
             if (server->hasArg(name)) {
                 String val = server->arg(name);
                 if (val.compareTo("true") == 0) {
                     destination = true;
-                    success = true;
                 } else if (val.compareTo("false") == 0) {
                     destination = false;
-                    success = true;
                 }
             }
         }

@@ -199,12 +199,12 @@ class InfluxDBCollector {
                 _settings->pushInterval);
         }
 
-        void parse_config_params(WebServerBase* webServer, bool& save) {
-            webServer->process_setting("ifx_enabled", _settings->enable, save);
-            webServer->process_setting("ifx_address", _settings->address, sizeof(_settings->address), save);
-            webServer->process_setting("ifx_db", _settings->database, sizeof(_settings->database), save);
-            webServer->process_setting("ifx_collect", _settings->collectInterval, save);
-            webServer->process_setting("ifx_push", _settings->pushInterval, save);
+        void parse_config_params(WebServerBase* webServer) {
+            webServer->process_setting("ifx_enabled", _settings->enable);
+            webServer->process_setting("ifx_address", _settings->address, sizeof(_settings->address));
+            webServer->process_setting("ifx_db", _settings->database, sizeof(_settings->database));
+            webServer->process_setting("ifx_collect", _settings->collectInterval);
+            webServer->process_setting("ifx_push", _settings->pushInterval);
         }
 
     // private:

@@ -7,6 +7,8 @@ struct NetworkSettings {
     char hostname[64];
     char ssid[32];
     char password[32];
+    uint8_t wifi_channel;  // Managed by the WiFiManager, used for quick reconnect
+    uint8_t bssid[6];   // Managed by the WiFiManager, used for quick reconnect
 };
 
 #include "Logger.h"
@@ -34,6 +36,8 @@ enum _WiFiState {
     AP
 };
 
+#define WIFI_CONNECT_TIMEOUT 15000  // 15 seconds
+
 class WiFiManager {
     public:
         WiFiManager(Logger* logger, NetworkSettings* settings) {
@@ -55,14 +59,20 @@ class WiFiManager {
                     break;
                 case CONNECTING:
                     if (WiFi.status() == WL_CONNECTED) {
-                        logger->log("Connected in %.1f seconds", (millis() - lastStateSetAt)/1000.0f);
-                        logger->log("IP address is %s", WiFi.localIP().toString().c_str());
+                        logger->log("Connected in %.1f seconds, IP address is %s",
+                                    (millis() - lastStateSetAt)/1000.0f,
+                                    WiFi.localIP().toString().c_str());
+
+                        // Store these for quicker connect next time.
+                        memcpy(settings->bssid, WiFi.BSSID(), 6);
+                        settings->wifi_channel = WiFi.channel();
+
                         state = CONNECTED;
                         lastStateSetAt = millis();
-                    } else if (millis() - lastStateSetAt > 30000) {
-                        logger->log("Failed to connect in 30 seconds, switching to AP mode");
+                    } else if (millis() - lastStateSetAt > WIFI_CONNECT_TIMEOUT) {
+                        logger->log("Connection failed, going in AP mode");
 
-                        // For debug purposes - switch to access mode.
+                        // For setup and debug purposes.
                         WiFi.softAPConfig(
                             IPAddress(192, 168, 0, 1),
                             IPAddress(192, 168, 0, 1),
@@ -120,55 +130,28 @@ class WiFiManager {
                 settings->ssid);
         }
 
-        void parse_config_params(WebServerBase* webServer, bool& save) {
-            webServer->process_setting("hostname", settings->hostname, sizeof(settings->hostname), save);
-            webServer->process_setting("ssid", settings->ssid, sizeof(settings->ssid), save);
-            webServer->process_setting("password", settings->password, sizeof(settings->password), save);
+        void parse_config_params(WebServerBase* webServer) {
+            webServer->process_setting("hostname", settings->hostname, sizeof(settings->hostname));
+            webServer->process_setting("ssid", settings->ssid, sizeof(settings->ssid));
+            webServer->process_setting("password", settings->password, sizeof(settings->password));
         }
 
     private:
         void _connect() {
             WiFi.disconnect();
 
-            int networks = WiFi.scanNetworks();
-            String strongestSSID = String("");
-            int strongestSignalStrength = -1000;
-
-            for (int i = 0; i < networks; i++) {
-                int signalStrength = WiFi.RSSI(i);
-                String ssid = WiFi.SSID(i);
-                if (ssid.equals(settings->ssid)) {
-                    if (strongestSignalStrength < signalStrength) {
-                        logger->log("Found %s (%ddBm)", ssid.c_str(), signalStrength);
-                        strongestSignalStrength = signalStrength;
-                        strongestSSID = WiFi.SSID(i);
-                    }
-                }
-            }
-
             logger->log("Hostname is %s", settings->hostname);
+            WiFi.hostname(settings->hostname);
 
-            if (strongestSSID.compareTo("") != 0) {
-                WiFi.hostname(settings->hostname);
-                WiFi.begin(strongestSSID.c_str(), settings->password);
+            lastStateSetAt = millis();
+            state = CONNECTING;
 
-                lastStateSetAt = millis();
-                state = CONNECTING;
-            } else {
-                logger->log("SSID \"%s\" not found, switching to AP mode", settings->ssid);
-
-                // For debug purposes - switch to access mode.
-                WiFi.softAPConfig(
-                    IPAddress(192, 168, 0, 1),
-                    IPAddress(192, 168, 0, 1),
-                    IPAddress(255, 255, 255, 0)); 
-                WiFi.softAP(settings->hostname);
-
-                lastStateSetAt = millis();
-                state = AP;
-            }
-
-            WiFi.scanDelete();
+            // Even with invalid bssid and wifi channel the below will succeed with correct ssid/password.
+            WiFi.begin(settings->ssid,
+                       settings->password,
+                       settings->wifi_channel,
+                       settings->bssid,
+                       true);
         }
 
         _WiFiState state;

@@ -12,33 +12,27 @@ template <class T> class SettingsBase {
         void begin() {
             EEPROM.begin(sizeof(T)+1);
 
-            uint8_t checksum = EEPROM.read(0);
+            _checksum = EEPROM.read(0);
             for (unsigned int i = 0; i < sizeof(T); i++) {
                 *(((uint8_t*)this->getSettings()) + i) = EEPROM.read(i+1);
             }
             EEPROM.end();
 
-            if (checksum == sizeof(T) % 256) {
+            if (_checksum == calculateChecksum()) {
                 _logger->log("Settings loaded successfully.");
             } else {
                 _logger->log("Invalid settings checksum.");
-                erase();
+                memset(this->getSettings(), 0, sizeof(T));
+                initializeSettings();
+                _checksum = calculateChecksum();
             }
         }
 
         void loop() {
-        }
-
-        void save() {
-            _logger->log("Writing state to EEPROM.");
-            writeToEEPROM();
-        }
-
-        void erase() {
-            _logger->log("Erasing EEPROM.");
-            memset(this->getSettings(), 0, sizeof(T));
-            initializeSettings();
-            writeToEEPROM();
+            if (_checksum != calculateChecksum()) {
+                _logger->log("Writing settings to EEPROM.");
+                writeToEEPROM();
+            }
         }
 
     protected:
@@ -46,9 +40,17 @@ template <class T> class SettingsBase {
         virtual T* getSettings() = 0;
 
     private:
+        uint8_t calculateChecksum() {
+            uint16_t checksum = 13;
+            for (unsigned int i = 0; i < sizeof(T); i++) {
+                checksum += *(((uint8_t*)this->getSettings()) + i);
+            }
+            return checksum % 256;
+        }
         void writeToEEPROM() {
             EEPROM.begin(sizeof(T)+1);
-            EEPROM.write(0, sizeof(T) % 256);
+            _checksum = calculateChecksum();
+            EEPROM.write(0, _checksum);
             for (unsigned int i = 0; i < sizeof(T); i++) {
                 EEPROM.write(i+1, *(((uint8_t*)this->getSettings()) + i));
             }
@@ -56,4 +58,5 @@ template <class T> class SettingsBase {
         }
 
         Logger* _logger = NULL;
+        uint8_t _checksum;
 };
