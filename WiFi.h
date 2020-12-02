@@ -7,6 +7,9 @@ struct NetworkSettings {
     char hostname[64];
     char ssid[32];
     char password[32];
+};
+
+struct RTCNetworkSettings {
     uint8_t wifi_channel;  // Managed by the WiFiManager, used for quick reconnect
     uint8_t bssid[6];   // Managed by the WiFiManager, used for quick reconnect
 };
@@ -36,50 +39,56 @@ enum _WiFiState {
     AP
 };
 
-#define WIFI_CONNECT_TIMEOUT 15000  // 15 seconds
+#define WIFI_CONNECT_TIMEOUT 10000  // 10 seconds
 
 class WiFiManager {
     public:
-        WiFiManager(Logger* logger, NetworkSettings* settings) {
-            this->logger = logger;
-            this->settings = settings;
+        WiFiManager(Logger* logger, NetworkSettings* settings, RTCNetworkSettings* rtcSettings=NULL) {
+            _logger = logger;
+            _settings = settings;
+            _rtcSettings = rtcSettings;
         }
 
         void begin() {
-            WiFi.persistent(false);
+            WiFi.persistent(true);
             WiFi.mode(WIFI_STA);
-            state = DISCONNECTED;
-            lastStateSetAt = millis();
+            _setState(DISCONNECTED);
         }
 
         void loop() {
-            switch(state) {
+            switch(_state) {
                 case CONNECTED:
                     // Do nothing.
                     break;
                 case CONNECTING:
                     if (WiFi.status() == WL_CONNECTED) {
-                        logger->log("Connected in %.1f seconds, IP address is %s",
-                                    (millis() - lastStateSetAt)/1000.0f,
+                        _logger->log("Connected in %.1f seconds, IP address is %s",
+                                    (millis() - _lastStateSetAt)/1000.0f,
                                     WiFi.localIP().toString().c_str());
 
-                        // Store these for quicker connect next time.
-                        memcpy(settings->bssid, WiFi.BSSID(), 6);
-                        settings->wifi_channel = WiFi.channel();
+                        if (_rtcSettings != NULL) {
+                            memcpy(_rtcSettings->bssid, WiFi.BSSID(), 6);
+                            _rtcSettings->wifi_channel = WiFi.channel();
+                        }
 
-                        state = CONNECTED;
-                        lastStateSetAt = millis();
-                    } else if (millis() - lastStateSetAt > WIFI_CONNECT_TIMEOUT) {
-                        logger->log("Connection failed, going in AP mode");
+                        _setState(CONNECTED);
+                    } else if (millis() - _lastStateSetAt > WIFI_CONNECT_TIMEOUT) {
+                        if (_rtcSettings != NULL &&_rtcSettings->wifi_channel != 0) {
+                            _logger->log("Quick connect failed, retrying with regular one");
+                            memset(_rtcSettings, 0, sizeof(RTCNetworkSettings));
+                            ESP.eraseConfig();
+                            _connect();
+                            break;
+                        }
+                        _logger->log("Connection failed, going in AP mode");
 
                         // For setup and debug purposes.
                         WiFi.softAPConfig(
                             IPAddress(192, 168, 0, 1),
                             IPAddress(192, 168, 0, 1),
                             IPAddress(255, 255, 255, 0)); 
-                        WiFi.softAP(settings->hostname);
-                        state = AP;
-                        lastStateSetAt = millis();
+                        WiFi.softAP(_settings->hostname);
+                        _setState(AP);
                     }
                     break;
                 case DISCONNECTED:
@@ -88,8 +97,8 @@ class WiFiManager {
                 case AP:
                     // If there is network configured - don't stay in AP mode for more than 5
                     // minutes. Try to reconnect to the configured network.
-                    if (strlen(settings->ssid) > 1 &&
-                        millis() - lastStateSetAt > 5 * 60 * 1000) {
+                    if (strlen(_settings->ssid) > 1 &&
+                        millis() - _lastStateSetAt > 5 * 60 * 1000) {
                         disconnect();
                         delay(1000);
                         connect();
@@ -98,7 +107,7 @@ class WiFiManager {
         }
 
         void connect() {
-            if (state != DISCONNECTED) {
+            if (_state != DISCONNECTED) {
                 return;
             }
             WiFi.mode(WIFI_STA);
@@ -106,57 +115,66 @@ class WiFiManager {
         }
 
         void disconnect() {
-            if (state == DISCONNECTED) {
+            if (_state == DISCONNECTED) {
                 return;
             }
             WiFi.mode(WIFI_OFF);
-            state = DISCONNECTED;
-            lastStateSetAt = millis();
+            _setState(DISCONNECTED);
         }
 
         bool isConnected() {
-            return WiFi.status() == WL_CONNECTED && state == CONNECTED;
+            return WiFi.status() == WL_CONNECTED && _state == CONNECTED;
         }
 
         bool isInAPMode() {
-            return state == AP;
+            return _state == AP;
         }
 
         void get_config_page(char* buffer) {
             sprintf_P(
                 buffer,
                 NETWORK_CONFIG_PAGE,
-                settings->hostname,
-                settings->ssid);
+                _settings->hostname,
+                _settings->ssid);
         }
 
         void parse_config_params(WebServerBase* webServer) {
-            webServer->process_setting("hostname", settings->hostname, sizeof(settings->hostname));
-            webServer->process_setting("ssid", settings->ssid, sizeof(settings->ssid));
-            webServer->process_setting("password", settings->password, sizeof(settings->password));
+            webServer->process_setting("hostname", _settings->hostname, sizeof(_settings->hostname));
+            webServer->process_setting("ssid", _settings->ssid, sizeof(_settings->ssid));
+            webServer->process_setting("password", _settings->password, sizeof(_settings->password));
         }
 
     private:
         void _connect() {
-            WiFi.disconnect();
+            // WiFi.disconnect();
 
-            logger->log("Hostname is %s", settings->hostname);
-            WiFi.hostname(settings->hostname);
+            _logger->log("Hostname is %s", _settings->hostname);
+            _logger->log("Connecting to %s with %s", _settings->ssid, _settings->password);
 
-            lastStateSetAt = millis();
-            state = CONNECTING;
+            _setState(CONNECTING);
 
-            // Even with invalid bssid and wifi channel the below will succeed with correct ssid/password.
-            WiFi.begin(settings->ssid,
-                       settings->password,
-                       settings->wifi_channel,
-                       settings->bssid,
-                       true);
+            WiFi.hostname(_settings->hostname);
+
+            if (_rtcSettings != NULL && _rtcSettings->wifi_channel != 0) {
+                WiFi.begin(_settings->ssid,
+                           _settings->password,
+                           _rtcSettings->wifi_channel,
+                           _rtcSettings->bssid,
+                           true);
+            } else {
+                WiFi.begin(_settings->ssid, _settings->password);
+            }
         }
 
-        _WiFiState state;
-        unsigned long lastStateSetAt;
+        void _setState(_WiFiState state) {
+            _state = state;
+            _lastStateSetAt = millis();
+        }
 
-        Logger* logger = NULL;
-        NetworkSettings* settings = NULL;
+        _WiFiState _state;
+        unsigned long _lastStateSetAt;
+
+        Logger* _logger = NULL;
+        NetworkSettings* _settings = NULL;
+        RTCNetworkSettings* _rtcSettings = NULL;
 };

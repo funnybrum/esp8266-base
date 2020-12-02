@@ -18,6 +18,11 @@ class WebServerBase {
         };
  
         void begin() {
+            if (server != NULL) {
+                // Already invoked.
+                return;
+            }
+
             server = new ESP8266WebServer(80);
             server->on("/reboot", std::bind(&WebServerBase::handle_reboot, this));
             server->on("/logs", std::bind(&WebServerBase::handle_logs, this));
@@ -91,7 +96,7 @@ class WebServerBase {
     protected:
         Logger* logger = NULL;
         SystemCheck* systemCheck = NULL;
-        ESP8266WebServer *server;
+        ESP8266WebServer *server = NULL;
 
     private:
         ESP8266HTTPUpdateServer *httpUpdater;
