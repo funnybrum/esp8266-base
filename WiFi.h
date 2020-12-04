@@ -50,7 +50,7 @@ class WiFiManager {
         }
 
         void begin() {
-            WiFi.persistent(true);
+            WiFi.persistent(false);
             WiFi.mode(WIFI_STA);
             _setState(DISCONNECTED);
         }
@@ -62,9 +62,11 @@ class WiFiManager {
                     break;
                 case CONNECTING:
                     if (WiFi.status() == WL_CONNECTED) {
-                        _logger->log("Connected in %.1f seconds, IP address is %s",
-                                    (millis() - _lastStateSetAt)/1000.0f,
-                                    WiFi.localIP().toString().c_str());
+                        if (_logger != NULL) {
+                            _logger->log("Connected in %.1f seconds, IP address is %s",
+                                        (millis() - _lastStateSetAt)/1000.0f,
+                                        WiFi.localIP().toString().c_str());
+                        }
 
                         if (_rtcSettings != NULL) {
                             memcpy(_rtcSettings->bssid, WiFi.BSSID(), 6);
@@ -72,17 +74,22 @@ class WiFiManager {
                         }
 
                         _setState(CONNECTED);
-                    } else if (millis() - _lastStateSetAt > WIFI_CONNECT_TIMEOUT) {
+                    } else if (millis() - _lastStateSetAt > WIFI_CONNECT_TIMEOUT || strlen(_settings->ssid)==0) {
                         if (_rtcSettings != NULL &&_rtcSettings->wifi_channel != 0) {
-                            _logger->log("Quick connect failed, retrying with regular one");
-                            memset(_rtcSettings, 0, sizeof(RTCNetworkSettings));
+                            if (_logger != NULL) {
+                                _logger->log("Quick connect failed, retrying with regular one");
+                            }
+                            _rtcSettings->wifi_channel = 0;
                             ESP.eraseConfig();
                             _connect();
                             break;
                         }
-                        _logger->log("Connection failed, going in AP mode");
+                        if (_logger != NULL) {
+                            _logger->log("Connection failed, going in AP mode");
+                        }
 
                         // For setup and debug purposes.
+                        WiFi.disconnect();
                         WiFi.softAPConfig(
                             IPAddress(192, 168, 0, 1),
                             IPAddress(192, 168, 0, 1),
@@ -148,12 +155,23 @@ class WiFiManager {
         void _connect() {
             // WiFi.disconnect();
 
-            _logger->log("Hostname is %s", _settings->hostname);
-            _logger->log("Connecting to %s with %s", _settings->ssid, _settings->password);
+            if (_logger != NULL) {
+                _logger->log("Hostname is %s", _settings->hostname);
+            }
 
             _setState(CONNECTING);
 
             WiFi.hostname(_settings->hostname);
+
+            if (strlen(_settings->ssid)==0) {
+                ESP.eraseConfig();
+                if (_rtcSettings != NULL) {
+                    _rtcSettings->wifi_channel = 0;
+                }
+                // Skip connecting attempts and directly go to AP mode for enabling configuration
+                // through the web UI.
+                return;
+            }
 
             if (_rtcSettings != NULL && _rtcSettings->wifi_channel != 0) {
                 WiFi.begin(_settings->ssid,
