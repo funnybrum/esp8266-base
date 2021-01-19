@@ -73,7 +73,7 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
         }
 
         bool readEEPROM() {
-            EEPROM.begin(sizeof(T_EEPROM)+1);
+            EEPROM.begin(sizeof(T_EEPROM)+4);
 
             // Read the checksum
             _checksum = (EEPROM.read(0) << 24) |
@@ -92,7 +92,7 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
 
         void writeEEPROM() {
                 _checksum = calculateEEPROMChecksum();
-                EEPROM.begin(sizeof(T_EEPROM)+1);
+                EEPROM.begin(sizeof(T_EEPROM)+4);
 
                 // Write the checksum
                 EEPROM.write(0, (_checksum >> 24) & 0xFF);
