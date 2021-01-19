@@ -48,28 +48,42 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
         virtual T_RTC* getRTCSettings() = 0;
 
     private:
-        uint8_t calculateChecksum(void* addr, uint16_t size) {
-            uint16_t checksum = 13;
-            for (unsigned int i = 0; i < size; i++) {
-                checksum += *(((uint8_t*)addr) + i);
+        uint32_t crc32(const void *data, uint16_t size) {
+            uint16_t i, j;
+            uint32_t byte, crc, mask;
+
+            crc = 0xFFFFFFFF;
+            for (i = 0; i < size; i++) {
+                byte = *(((uint8_t*)data) + i);            // Get next byte.
+                crc = crc ^ byte;
+                for (j = 0; j < 8; j++) {    // Do eight times.
+                    mask = -(crc & 1);
+                    crc = (crc >> 1) ^ (0xEDB88320 & mask);
+                }
             }
-            checksum += size;
-            return checksum % 256;
+            return crc;
         }
 
-        uint8_t calculateRTCChecksum() {
-            return calculateChecksum(getRTCSettings(), sizeof(T_RTC));
+        uint32_t calculateRTCChecksum() {
+            return crc32(getRTCSettings(), sizeof(T_RTC));
         }
 
-        uint8_t calculateEEPROMChecksum() {
-            return calculateChecksum(getSettings(), sizeof(T_EEPROM));
+        uint32_t calculateEEPROMChecksum() {
+            return crc32(getSettings(), sizeof(T_EEPROM));
         }
 
         bool readEEPROM() {
             EEPROM.begin(sizeof(T_EEPROM)+1);
-            _checksum = EEPROM.read(0);
+
+            // Read the checksum
+            _checksum = (EEPROM.read(0) << 24) |
+                        (EEPROM.read(1) << 16) |
+                        (EEPROM.read(2) << 8) |
+                        EEPROM.read(3);
+            
+            // Read the data
             for (unsigned int i = 0; i < sizeof(T_EEPROM); i++) {
-                *((uint8_t*)getSettings() + i) = EEPROM.read(i+1);
+                *((uint8_t*)getSettings() + i) = EEPROM.read(i+4);
             }
             EEPROM.end();
 
@@ -79,9 +93,16 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
         void writeEEPROM() {
                 _checksum = calculateEEPROMChecksum();
                 EEPROM.begin(sizeof(T_EEPROM)+1);
-                EEPROM.write(0, _checksum);
+
+                // Write the checksum
+                EEPROM.write(0, (_checksum >> 24) & 0xFF);
+                EEPROM.write(1, (_checksum >> 16) & 0xFF);
+                EEPROM.write(2, (_checksum >> 8) & 0xFF);
+                EEPROM.write(3, _checksum & 0xFF);
+
+                // Write the data
                 for (unsigned int i = 0; i < sizeof(T_EEPROM); i++) {
-                    EEPROM.write(i+1, *(((uint8_t*)getSettings()) + i));
+                    EEPROM.write(i+4, *(((uint8_t*)getSettings()) + i));
                 }
                 EEPROM.end();
         }
@@ -101,6 +122,6 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
         }
 
         Logger* _logger = NULL;
-        uint8_t _checksum;
+        uint32_t _checksum;
         uint32_t _rtcChecksum;
 };
