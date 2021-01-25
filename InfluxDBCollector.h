@@ -83,12 +83,12 @@ class InfluxDBCollector {
 
             // Get the remote time stamp every 24 hours.
             if (remoteTimestamp == 0 || (millis() - remoteTimestampMillis) > 24 * 60 * 60 * 1000) {
-                if (!_wifi->isConnected()) {
+                if (_wifi != NULL && !_wifi->isConnected()) {
                     _wifi->connect();
                 } else {
                     ping();
                     // Don't disconnect in the first 30 minutes.
-                    if (millis() > 30 * 60 * 1000) {
+                    if (_wifi != NULL && millis() > 30 * 60 * 1000) {
                         _wifi->disconnect();
                     }
                 }
@@ -101,13 +101,13 @@ class InfluxDBCollector {
                 telemetryDataSize >= 0.80f * TELEMETRY_BUFFER_SIZE ||
                 shouldPush()) {
                 // Time for push. Either the time for that has come or the buffer is getting full.
-                if (!_wifi->isConnected()) {
+                if (_wifi != NULL && !_wifi->isConnected()) {
                     _wifi->connect();
                 } else {
                     if (push()) {
                         lastDataPush = millis();
                         // Don't disconnect in the first 30 minutes.
-                        if (millis() > 30 * 60 * 1000) {
+                        if (_wifi != NULL && millis() > 30 * 60 * 1000) {
                             _wifi->disconnect();
                         }
                     }
@@ -310,8 +310,10 @@ class InfluxDBCollector {
                 onPush();
             } else {
                 _logger->log("Push failed with HTTP %d", statusCode);
-                _wifi->disconnect();
-                _wifi->connect();
+                if (_wifi != NULL) {
+                    _wifi->disconnect();
+                    _wifi->connect();
+                }
             }
 
             http->end();
