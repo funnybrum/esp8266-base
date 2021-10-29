@@ -18,6 +18,10 @@ A kind of watchdog, but very software one. If enabled - it will monitor the ESP8
 
 Web server base with build-in OTA update mechanism. Integrated with the logger and the system check tools.
 
+## RS485ServerBase
+
+Similar to an web server, but support RS485 communication. Commands are received over the wire.
+
 ## WiFiManager
 
 The WiFi Manager will take care for the WiFi connectivity. Integrated with the other tools. Settings are stored in the EEPROM and  details like SSID and password can be kept between restarts. If the configured WiFi SSID/password are invalid - the microcontroller will switch to AP mode. The user can connect to it and open 192.168.0.1 to configure the correct SSID/password.
