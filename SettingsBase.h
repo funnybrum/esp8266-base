@@ -42,6 +42,10 @@ template <class T_EEPROM, class T_RTC> class SettingsBase {
             }            
         }
 
+        uint32_t getRTCCheckSum() {
+            return calculateRTCChecksum();
+        }
+
     protected:
         virtual void initializeSettings() = 0;
         virtual T_EEPROM* getSettings() = 0;
