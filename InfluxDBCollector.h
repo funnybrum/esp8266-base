@@ -51,8 +51,11 @@ class InfluxDBCollector {
         // Collect the data.
         virtual void collectData() = 0;
 
-        // Will be called on each push.
-        virtual void onPush() = 0;
+        // Will be called after each push.
+        virtual void afterPush() = 0;
+
+        // Will be called before each push.
+        virtual void beforePush() = 0;
 
         // If result is true data will be pushed on the current loop cycle.
         virtual bool shouldPush() = 0;
@@ -295,6 +298,8 @@ class InfluxDBCollector {
         }
 
         bool push() {
+            beforePush();
+
             String url = "";
             url += _settings->address;
             url += "/write?precision=s&db=";
@@ -307,7 +312,7 @@ class InfluxDBCollector {
             if (success) {
                 telemetryDataSize = 0;
                 syncTime(http->header("date").c_str());
-                onPush();
+                afterPush();
             } else {
                 _logger->log("Push failed with HTTP %d", statusCode);
                 if (_wifi != NULL) {
