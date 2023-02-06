@@ -5,14 +5,12 @@
 #include <ESP8266mDNS.h>
 
 #include "Logger.h"
-#include "SystemCheck.h"
 #include "WiFi.h"
 
 class WebServerBase {
     public:
-        WebServerBase(NetworkSettings* networkSettings, Logger* logger, SystemCheck* systemCheck=NULL) {
+        WebServerBase(NetworkSettings* networkSettings, Logger* logger) {
             this->logger = logger;
-            this->systemCheck = systemCheck;
             this->networkSettings = networkSettings;
 
         };
@@ -31,8 +29,8 @@ class WebServerBase {
             httpUpdater = new ESP8266HTTPUpdateServer(true);
             httpUpdater->setup(server);
 
-            MDNS.begin(networkSettings->hostname);
-            MDNS.addService("http", "tcp", 80);
+            // MDNS.begin(networkSettings->hostname);
+            // MDNS.addService("http", "tcp", 80);
 
             server->begin();
         }
@@ -95,7 +93,6 @@ class WebServerBase {
 
     protected:
         Logger* logger = NULL;
-        SystemCheck* systemCheck = NULL;
         ESP8266WebServer *server = NULL;
 
     private:
@@ -109,9 +106,6 @@ class WebServerBase {
         }
 
         void handle_logs() {
-            if (systemCheck != NULL) {
-                systemCheck->registerWebCall();
-            }
             server->send(200, "text/plain", logger->getLogs());
         }
 };
