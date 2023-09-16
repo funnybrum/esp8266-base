@@ -7,6 +7,7 @@
 #include "Logger.h"
 #include "WiFi.h"
 #include "WebServerBase.h"
+#include <WiFiClient.h>
 
 const char INFLUXDB_CONFIG_PAGE[] PROGMEM = R"=====(
 <fieldset style='display: inline-block; width: 300px'>
@@ -289,7 +290,7 @@ class InfluxDBCollector {
             String url = "";
             url += _settings->address;
             url += "/ping";
-            http->begin(url);
+            http->begin(this->_wifiClient, url);
             int httpCode = http->GET();
             if (httpCode == 204) {
                 syncTime(http->header("date").c_str());
@@ -305,7 +306,7 @@ class InfluxDBCollector {
             url += "/write?precision=s&db=";
             url += _settings->database;
 
-            http->begin(url);
+            http->begin(this->_wifiClient, url);
             int statusCode = http->POST((uint8_t *)telemetryData, telemetryDataSize-1);  // -1 to remove
                         
             bool success = statusCode == 204;                                                                // the last '\n'.
@@ -338,4 +339,5 @@ class InfluxDBCollector {
         WiFiManager* _wifi = NULL;
         InfluxDBCollectorSettings* _settings = NULL;
         NetworkSettings* _networkSettings = NULL;
+        WiFiClient _wifiClient = WiFiClient();
 };
